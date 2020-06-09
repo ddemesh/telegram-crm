@@ -17,13 +17,13 @@ import org.springframework.http.client.reactive.ClientHttpConnector;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.reactive.function.BodyExtractors;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriUtils;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 
 import java.util.Arrays;
 import java.util.List;
@@ -45,7 +45,7 @@ public class PostManagementServiceImpl implements PostManagementService {
     private WebClient webClient;
 
     public PostManagementServiceImpl(WebClient.Builder webClientBuilder) {
-        HttpClient httpClient = HttpClient.create()
+        HttpClient httpClient = HttpClient.create(ConnectionProvider.newConnection())
                 .tcpConfiguration(tcpClient -> {
                     tcpClient = tcpClient.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 60000);
                     tcpClient = tcpClient.doOnConnected(conn -> conn
@@ -150,7 +150,8 @@ public class PostManagementServiceImpl implements PostManagementService {
                     if (response.statusCode().is2xxSuccessful()) {
                         return response.bodyToMono(ByteArrayResource.class);
                     }
-                    return Mono.error(new RuntimeException("Cant load file " + url + ": " + response.body(BodyExtractors.toDataBuffers())));
+                    return response.bodyToMono(String.class)
+                            .flatMap(resp -> Mono.error(new RuntimeException("Cant load file " + url + ": " + resp)));
                 })
                 .doOnError(throwable -> log.error("Exception while loading file: " + throwable));
     }
